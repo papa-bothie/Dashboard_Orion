@@ -2,19 +2,20 @@ import { AlertTriangle, MapPin, Clock, User, Camera, Brain } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { IncidentUrgency, IncidentStatus, IncidentSource, AssignedBy } from "@/types/incident.types";
 
 interface IncidentCardProps {
   id: string;
   type: string;
   location: string;
-  urgency: "urgent" | "medium" | "low";
-  status: "pending" | "assigned" | "resolved";
+  urgency: IncidentUrgency;
+  status: IncidentStatus;
   agent?: string;
   time: string;
   onAssign?: (id: string) => void;
-  source?: "manual" | "camera" | "ai";
+  source?: IncidentSource;
   cameraId?: string;
-  assignedBy?: "manual" | "ai";
+  assignedBy?: AssignedBy;
 }
 
 const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssign, source, cameraId, assignedBy }: IncidentCardProps) => {
@@ -24,10 +25,12 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
     low: { variant: "success" as const, text: "Faible" },
   };
 
-  const statusVariants = {
-    pending: { variant: "outline" as const, text: "En attente" },
-    assigned: { variant: "default" as const, text: "Assigné" },
-    resolved: { variant: "success" as const, text: "Résolu" },
+  const statusVariants: Record<IncidentStatus, { variant: "outline" | "default" | "success" | "warning"; text: string }> = {
+    pending: { variant: "outline", text: "En attente" },
+    assigned: { variant: "default", text: "Assigné" },
+    in_progress: { variant: "warning", text: "En cours" },
+    resolved: { variant: "success", text: "Résolu" },
+    closed: { variant: "outline", text: "Clôturé" },
   };
 
   return (
@@ -39,7 +42,7 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
             <span className="text-primary font-medium">Détecté par Caméra #{cameraId}</span>
           </div>
         )}
-        
+
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-warning/10 rounded-lg">
@@ -63,7 +66,7 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
             <MapPin className="h-3 w-3 text-muted-foreground" />
             <span className="text-muted-foreground">{location}</span>
           </div>
-          
+
           {agent && (
             <div className="flex items-center gap-2 text-sm">
               <User className="h-3 w-3 text-muted-foreground" />
@@ -84,10 +87,10 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
               </Badge>
             )}
           </div>
-          
+
           {status === "pending" && onAssign && (
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="gradient"
               onClick={() => onAssign(id)}
             >
