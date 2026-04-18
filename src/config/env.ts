@@ -7,13 +7,13 @@
  * Configuration centralisée des variables d'environnement.
  *
  * Variables à définir dans le fichier .env (voir .env.example) :
- *   VITE_API_URL   — URL de base du backend REST (ex: http://localhost:3001)
- *   VITE_WS_URL    — URL du serveur WebSocket   (ex: ws://localhost:3001)
+ *   VITE_API_URL   — URL de base du backend REST (ex: http://localhost:3000)
+ *   VITE_WS_URL    — URL du serveur WebSocket   (ex: http://localhost:3000)
  *   VITE_APP_ENV   — Environnement              (development | staging | production)
  */
 export const ENV = {
-    API_URL: import.meta.env.VITE_API_URL ?? "http://localhost:3001",
-    WS_URL: import.meta.env.VITE_WS_URL ?? "ws://localhost:3001",
+    API_URL: import.meta.env.VITE_API_URL ?? "http://localhost:3000",
+    WS_URL: import.meta.env.VITE_WS_URL ?? "http://localhost:3000",
     APP_ENV: (import.meta.env.VITE_APP_ENV ?? "development") as
         | "development"
         | "staging"

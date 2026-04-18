@@ -18,9 +18,6 @@ export const AGENTS_QUERY_KEY = ["agents"] as const;
 export function useAgents() {
     return useQuery({
         queryKey: AGENTS_QUERY_KEY,
-        queryFn: async (): Promise<Agent[]> => {
-            const response = await agentsService.getAll();
-            return response.data;
-        },
+        queryFn: () => agentsService.getAll(),
     });
 }

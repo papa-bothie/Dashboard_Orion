@@ -1,45 +1,60 @@
 // ============================================================
 // ORION — Service API : Agents
-// Couche d'accès aux données agents du backend
 // ============================================================
 
-import { apiClient } from "./client";
-import type { Agent } from "@/types/agent.types";
-import type { ApiResponse } from "@/types/api.types";
+import { apiClient } from "./axios.config";
+import type { Agent, AgentStatus, AgentSkill } from "@/types/agent.types";
+
+/**
+ * Extrait un tableau depuis la réponse API ORION.
+ */
+function extractArray(data: any): any[] {
+  const payload = data?.data || data;
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    const firstArray = Object.values(payload).find(Array.isArray);
+    if (firstArray) return firstArray as any[];
+  }
+  return [];
+}
+
+/**
+ * Mappe un agent du backend vers le format du frontend.
+ */
+function mapAgent(backendAgent: any): Agent {
+  // Mapping du statut
+  const statusMap: Record<string, AgentStatus> = {
+    DISPONIBLE: "available",
+    EN_INTERVENTION: "busy",
+    INACTIF: "offline",
+  };
+
+  const name = [backendAgent.prenom, backendAgent.nom].filter(Boolean).join(" ") || "Agent Inconnu";
+  const mappedStatus = statusMap[backendAgent.statut] || "offline";
+
+  return {
+    id: backendAgent.id,
+    name,
+    status: mappedStatus as AgentStatus,
+    location: "Sur zone", // Valeur par défaut
+    lat: backendAgent.latitude || 14.6928,
+    lng: backendAgent.longitude || -17.4467,
+    skills: ["sécurité"] as AgentSkill[], // Valeur par défaut
+    phone: backendAgent.telephone,
+    email: backendAgent.email,
+  };
+}
 
 export const agentsService = {
-    /**
-     * Récupère la liste complète des agents.
-     * GET /api/agents
-     */
-    getAll: (): Promise<ApiResponse<Agent[]>> =>
-        apiClient.get<ApiResponse<Agent[]>>("/agents"),
+  getAgentsDisponibles: async (): Promise<Agent[]> => {
+    const data = await apiClient.get<any, any>("/agents/disponibles");
+    const rawAgents = extractArray(data);
+    return rawAgents.map(mapAgent);
+  },
 
-    /**
-     * Récupère un agent par son identifiant.
-     * GET /api/agents/:id
-     */
-    getById: (id: string): Promise<ApiResponse<Agent>> =>
-        apiClient.get<ApiResponse<Agent>>(`/agents/${id}`),
-
-    /**
-     * Met à jour le statut d'un agent.
-     * PATCH /api/agents/:id/status
-     */
-    updateStatus: (
-        id: string,
-        status: Agent["status"]
-    ): Promise<ApiResponse<Agent>> =>
-        apiClient.patch<ApiResponse<Agent>>(`/agents/${id}/status`, { status }),
-
-    /**
-     * Met à jour la position GPS d'un agent.
-     * PATCH /api/agents/:id/position
-     */
-    updatePosition: (
-        id: string,
-        lat: number,
-        lng: number
-    ): Promise<ApiResponse<Agent>> =>
-        apiClient.patch<ApiResponse<Agent>>(`/agents/${id}/position`, { lat, lng }),
+  getAll: async (): Promise<Agent[]> => {
+    const data = await apiClient.get<any, any>("/agents");
+    const rawAgents = extractArray(data);
+    return rawAgents.map(mapAgent);
+  },
 };
