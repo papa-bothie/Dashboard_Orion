@@ -1,4 +1,5 @@
 import { AlertTriangle, MapPin, Clock, User, Camera, Brain } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,13 @@ interface IncidentCardProps {
   agent?: string;
   time: string;
   onAssign?: (id: string) => void;
+  onUnassign?: (id: string) => void;
   source?: IncidentSource;
   cameraId?: string;
   assignedBy?: AssignedBy;
 }
 
-const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssign, source, cameraId, assignedBy }: IncidentCardProps) => {
+const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssign, onUnassign, source, cameraId, assignedBy }: IncidentCardProps) => {
   const urgencyVariants = {
     urgent: { variant: "warning" as const, text: "Urgent" },
     medium: { variant: "default" as const, text: "Moyen" },
@@ -49,7 +51,9 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
               <AlertTriangle className="h-4 w-4 text-warning" />
             </div>
             <div>
-              <h4 className="font-semibold text-sm">{type}</h4>
+              <Link to={`/incidents/${id}`} className="hover:underline">
+                 <h4 className="font-semibold text-sm">{type}</h4>
+              </Link>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <Clock className="h-3 w-3" />
                 <span>{time}</span>
@@ -88,15 +92,29 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
             )}
           </div>
 
-          {status === "pending" && onAssign && (
-            <Button
-              size="sm"
-              variant="gradient"
-              onClick={() => onAssign(id)}
-            >
-              Affecter
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/incidents/${id}`}>Détails</Link>
             </Button>
-          )}
+            {status === "pending" && onAssign && (
+              <Button
+                size="sm"
+                variant="gradient"
+                onClick={() => onAssign(id)}
+              >
+                Affecter
+              </Button>
+            )}
+            {(status === "assigned" || status === "in_progress") && onUnassign && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => onUnassign(id)}
+              >
+                Désaffecter
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

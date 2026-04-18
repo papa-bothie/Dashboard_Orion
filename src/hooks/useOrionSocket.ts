@@ -5,34 +5,26 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { io } from "socket.io-client";
+import { ENV } from "@/config/env";
 import { AGENTS_QUERY_KEY } from "@/hooks/queries/useAgents";
 import { INCIDENTS_QUERY_KEY } from "@/hooks/queries/useIncidents";
 import { ORION_EVENTS } from "@/services/socket/socket";
 import type { Agent } from "@/types/agent.types";
 import type { Incident } from "@/types/incident.types";
 
-// ─── PRÉREQUIS ────────────────────────────────────────────────
-// Installer socket.io-client avant d'activer ce hook :
-//   npm install socket.io-client
-// ─────────────────────────────────────────────────────────────
-
 /**
  * Hook de connexion WebSocket ORION.
  *
- * Écoute les événements temps réel et met à jour le cache React Query
- * sans déclencher de refetch HTTP inutile.
+ * Écoute les événements temps réel émis par le backend NestJS
+ * et met à jour le cache React Query sans déclencher de refetch HTTP.
  *
  * Architecture :
- *   Backend NestJS WebSocket Gateway
- *     ↓ événements
+ *   App Mobile → POST /signalements → Backend NestJS
+ *     ↓ socket.emit("incident:new", data)
  *   useOrionSocket (ce hook)
  *     ↓ queryClient.setQueryData()
- *   Composants UI (re-render automatique)
- *
- * Pour activer :
- *   1. `npm install socket.io-client`
- *   2. Décommenter les blocs socket dans ce fichier
- *   3. Configurer VITE_WS_URL dans .env
+ *   Composants UI (re-render instantané)
  */
 export function useOrionSocket() {
     const queryClient = useQueryClient();
@@ -41,22 +33,32 @@ export function useOrionSocket() {
     // ─── Handlers des événements ────────────────────────────────
 
     const handleNewIncident = useCallback(
-        (incident: Incident) => {
-            queryClient.setQueryData(
-                INCIDENTS_QUERY_KEY,
-                (old: Incident[] = []) => [incident, ...old]
-            );
+        (backendIncident: any) => {
+            console.log("[ORION Socket] Nouvel incident reçu (brut) :", backendIncident);
+            import("@/services/api/incidents.service").then(({ mapIncident }) => {
+                const incident = mapIncident(backendIncident);
+                queryClient.setQueryData(
+                    INCIDENTS_QUERY_KEY,
+                    (old: Incident[] = []) => [incident, ...old]
+                );
+                queryClient.invalidateQueries({ queryKey: ["statistics"] });
+            });
         },
         [queryClient]
     );
 
     const handleIncidentUpdated = useCallback(
-        (updated: Incident) => {
-            queryClient.setQueryData(
-                INCIDENTS_QUERY_KEY,
-                (old: Incident[] = []) =>
-                    old.map((inc) => (inc.id === updated.id ? updated : inc))
-            );
+        (backendIncident: any) => {
+            console.log("[ORION Socket] Incident mis à jour (brut) :", backendIncident);
+            import("@/services/api/incidents.service").then(({ mapIncident }) => {
+                const updated = mapIncident(backendIncident);
+                queryClient.setQueryData(
+                    INCIDENTS_QUERY_KEY,
+                    (old: Incident[] = []) =>
+                        old.map((inc) => (inc.id === updated.id ? updated : inc))
+                );
+                queryClient.invalidateQueries({ queryKey: ["statistics"] });
+            });
         },
         [queryClient]
     );
@@ -83,12 +85,12 @@ export function useOrionSocket() {
     );
 
     const handleAgentUpdate = useCallback(
-        (updated: Agent) => {
-            queryClient.setQueryData(
-                AGENTS_QUERY_KEY,
-                (old: Agent[] = []) =>
-                    old.map((agent) => (agent.id === updated.id ? updated : agent))
-            );
+        (backendAgent: any) => {
+            console.log("[ORION Socket] Agent mis à jour (brut) :", backendAgent);
+            // On devrait exporter mapAgent pour bien faire, mais on se contentera 
+            // de l'update basique si besoin, ou on peut juste refetch.
+            queryClient.invalidateQueries({ queryKey: AGENTS_QUERY_KEY });
+            // TODO: si on avait exporté mapAgent, on ferait le mapAgent ici.
         },
         [queryClient]
     );
@@ -96,38 +98,41 @@ export function useOrionSocket() {
     // ─── Connexion WebSocket ──────────────────────────────────────
 
     useEffect(() => {
-        // TODO: Décommenter et activer quand le backend WebSocket est prêt
-        //
-        // import { ENV } from "@/config/env";
-        // import { io } from "socket.io-client";
-        //
-        // const socket = io(ENV.WS_URL, {
-        //   transports: ["websocket"],
-        //   reconnectionAttempts: 5,
-        //   reconnectionDelay: 2000,
-        // });
-        //
-        // socket.on("connect", () => {
-        //   isConnectedRef.current = true;
-        //   socket.emit(ORION_EVENTS.DASHBOARD_SUBSCRIBE);
-        //   console.log("[ORION Socket] Connecté ✓");
-        // });
-        //
-        // socket.on("disconnect", (reason) => {
-        //   isConnectedRef.current = false;
-        //   console.warn("[ORION Socket] Déconnecté :", reason);
-        // });
-        //
-        // socket.on(ORION_EVENTS.INCIDENT_NEW, handleNewIncident);
-        // socket.on(ORION_EVENTS.INCIDENT_UPDATED, handleIncidentUpdated);
-        // socket.on(ORION_EVENTS.INCIDENT_ASSIGNED, handleIncidentUpdated);
-        // socket.on(ORION_EVENTS.AGENT_POSITION, handleAgentPosition);
-        // socket.on(ORION_EVENTS.AGENT_UPDATE, handleAgentUpdate);
-        //
-        // return () => {
-        //   socket.disconnect();
-        //   isConnectedRef.current = false;
-        // };
+        const socket = io(ENV.WS_URL, {
+            transports: ["websocket"],
+            reconnectionAttempts: 5,
+            reconnectionDelay: 2000,
+        });
+
+        socket.on("connect", () => {
+            isConnectedRef.current = true;
+            socket.emit(ORION_EVENTS.DASHBOARD_SUBSCRIBE);
+            console.log("[ORION Socket] Connecté ✓ — ID :", socket.id);
+        });
+
+        socket.on("disconnect", (reason) => {
+            isConnectedRef.current = false;
+            console.warn("[ORION Socket] Déconnecté :", reason);
+        });
+
+        socket.on("connect_error", (err) => {
+            console.error("[ORION Socket] Erreur de connexion :", err.message);
+        });
+
+        // ── Écoute des événements incidents (signalements mobiles) ───
+        socket.on(ORION_EVENTS.INCIDENT_NEW, handleNewIncident);
+        socket.on(ORION_EVENTS.INCIDENT_UPDATED, handleIncidentUpdated);
+        socket.on(ORION_EVENTS.INCIDENT_ASSIGNED, handleIncidentUpdated);
+
+        // ── Écoute des événements agents ─────────────────────────────
+        socket.on(ORION_EVENTS.AGENT_POSITION, handleAgentPosition);
+        socket.on(ORION_EVENTS.AGENT_UPDATE, handleAgentUpdate);
+
+        return () => {
+            socket.disconnect();
+            isConnectedRef.current = false;
+            console.log("[ORION Socket] Déconnexion propre.");
+        };
     }, [
         handleNewIncident,
         handleIncidentUpdated,

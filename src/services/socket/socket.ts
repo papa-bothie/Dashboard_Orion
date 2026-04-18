@@ -44,10 +44,5 @@ export const ORION_EVENTS = {
 export type OrionEventName =
     (typeof ORION_EVENTS)[keyof typeof ORION_EVENTS];
 
-// Instance socket — à décommenter quand le backend est disponible
-// export const orionSocket: Socket = io(ENV.WS_URL, {
-//   autoConnect: false,
-//   transports: ["websocket"],
-//   reconnectionAttempts: 5,
-//   reconnectionDelay: 2000,
-// });
+// Pour le moment on n'exporte pas l'instance globale directe car useOrionSocket la gère
+// export const orionSocket: Socket = io(ENV.WS_URL, { ...
